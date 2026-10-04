@@ -19,8 +19,25 @@ const PREAMBLE =
 
 /** Playable pi session backed by one Durable Object. */
 export class PiAgent extends DurableObject<Env> {
-  // Workers AI and AI Gateway over the AI binding, as a pi-ai provider.
-  readonly ai = createAI({ binding: this.env.AI });
+  // Workers AI and AI Gateway over the GUARDIAN service binding, as a pi-ai provider.
+  readonly ai = createAI({
+    binding: {
+      run: async (model: string, input: any) => {
+        const res = await (this.env.GUARDIAN as any).run({
+          project: "pi-harness",
+          importance: "medium",
+          model,
+          input,
+          stream: input?.stream
+        });
+        if (res.stream) {
+          // core-guardian returns a Response for streams, env.AI.run returns a ReadableStream directly
+          return res.stream.body;
+        }
+        return res.body;
+      }
+    } as any
+  });
   // A durable filesystem on the object's SQLite, beside pi's own tables.
   // `exec` runs JavaScript modules in a fresh Dynamic Worker per call, with
   // no network of its own. `git` turns on `workspace.git`, which `ws:git`
